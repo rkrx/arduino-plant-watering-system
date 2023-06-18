@@ -1,6 +1,7 @@
 #include <TaskManagerIO.h>
 
 #define PIN_PUMP 3
+#define PIN_SOIL_SIGNAL 4
 #define PIN_LED 5
 #define PIN_WATER_SENSOR_POWER 6
 #define PIN_WATER_SENSOR_STATE A0
@@ -54,18 +55,18 @@ PumpStateHandler* pumpStateHandler = new PumpStateHandler();
 
 void checkMoistureLevel() {
   int moistureSensorValue = analogRead(PIN_MOISTURE_SENSOR);
-  Serial.print("Current moisture level: ");
-  Serial.print(moistureSensorValue);
-  Serial.print("; Soil is ");
   if(moistureSensorValue > MOISTURE_DRY) {
-    Serial.println("dry.");
     moistureLevel = SOIL_DRY;
+    digitalWrite(PIN_SOIL_SIGNAL, HIGH);
+    unsigned long alternator = millis() / 1000;
+    digitalWrite(PIN_SOIL_SIGNAL, alternator % 2 ? LOW : HIGH);
   } else if(moistureSensorValue > MOISTURE_WET) {
-    Serial.println("wet.");
     moistureLevel = SOIL_MOIST;
+    digitalWrite(PIN_SOIL_SIGNAL, LOW);
   } else {
-    Serial.println("very wet.");
     moistureLevel = SOIL_WET;
+    unsigned long alternator = millis() / 100;
+    digitalWrite(PIN_SOIL_SIGNAL, alternator % 2 ? LOW : HIGH);
   }
 }
 
@@ -150,14 +151,17 @@ void setup() {
   pinMode(PIN_PUMP, OUTPUT);
   digitalWrite(PIN_PUMP, LOW);
 
+  pinMode(PIN_SOIL_SIGNAL, OUTPUT);
+  digitalWrite(PIN_SOIL_SIGNAL, LOW);
+
   pinMode(PIN_LED, OUTPUT);
   digitalWrite(PIN_LED, LOW);
 
   pinMode(PIN_WATER_SENSOR_POWER, OUTPUT);
   digitalWrite(PIN_WATER_SENSOR_POWER, LOW);
 
-  taskManager.scheduleFixedRate(1000, checkMoistureLevel);
-  taskManager.scheduleFixedRate(500, checkWaterLevel);
+  taskManager.scheduleFixedRate(100, checkMoistureLevel);
+  taskManager.scheduleFixedRate(1500, checkWaterLevel);
   taskManager.scheduleFixedRate(50, handlePumpState);
 }
 
