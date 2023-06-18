@@ -2,6 +2,8 @@
 
 #define PIN_PUMP 3
 #define PIN_LED 5
+#define PIN_WATER_SENSOR_POWER 6
+#define PIN_WATER_SENSOR_STATE A0
 
 #define PIN_WATER_LEVEL A0
 #define PIN_MOISTURE_SENSOR A2
@@ -12,7 +14,9 @@
 #define MOISTURE_DRY MOISTURE_FULL_DRY - MOISTURE_INTERVAL
 #define MOISTURE_WET MOISTURE_FULL_WET + MOISTURE_INTERVAL
 
-#define WATER_LEVEL_THRESHOLD 750
+#define WATER_LEVEL_THRESHOLD 100
+#define PUMP_ACTIVE_TIME 2500UL
+#define PUMP_IDLE_TIME 10000UL
 
 enum MoistureLevel { SOIL_DRY, SOIL_MOIST, SOIL_WET };
 enum PumpState { PUMP_INIT, PUMP_CHECK, PUMP_WAIT, PUMP_ACTIVE, PUMP_IDLE, PUMP_OFF_BLINK_OFF, PUMP_OFF_BLINK_ON };
@@ -66,24 +70,21 @@ void checkMoistureLevel() {
 }
 
 void checkWaterLevel() {
-  int checkWaterLevel;
+  int waterLevel;
 
-  int level2 = 1024;
-  for(int i = 0; i < 20; i++) {
-    level2 = min(analogRead(PIN_WATER_LEVEL), level2);
-    delay(2);
-  }
+  digitalWrite(PIN_WATER_SENSOR_POWER, HIGH);
+  delay(10);
+  waterLevel = analogRead(PIN_WATER_SENSOR_STATE);
+  digitalWrite(PIN_WATER_SENSOR_POWER, LOW);
 
   Serial.print("Variable_3:");
-  Serial.println(level2);
+  Serial.println(waterLevel);
 
   if(waterState == WATER_LOW) {
     return;
   }
 
-  waterState = level2 > WATER_LEVEL_THRESHOLD ? WATER_OK : WATER_LOW;
-
-  pumpStateHandler->state = PUMP_CHECK;
+  waterState = waterLevel > WATER_LEVEL_THRESHOLD ? WATER_OK : WATER_LOW;
 }
 
 void handlePumpState() {
@@ -92,7 +93,11 @@ void handlePumpState() {
   }
 
   if(pumpStateHandler->state == PUMP_INIT) {
-    return;
+    if(waterState == WATER_OK) {
+      pumpStateHandler->state = PUMP_CHECK;
+    } else {
+      return;
+    }
   }
 
   if(pumpStateHandler->state == PUMP_OFF_BLINK_OFF) {
@@ -111,6 +116,11 @@ void handlePumpState() {
       return;
     }
 
+    if(moistureLevel == SOIL_MOIST) {
+      // Wait 6 hours and then check again to see if the soil is dry again.
+      return pumpStateHandler->wait(1000UL * 3600 * 6, PUMP_CHECK);
+    }
+
     if(moistureLevel == SOIL_DRY) {
       pumpStateHandler->state = PUMP_ACTIVE;
       return;
@@ -123,21 +133,28 @@ void handlePumpState() {
     Serial.print("Variable_2:");
     Serial.println(500);
     digitalWrite(PIN_PUMP, HIGH);
-    return pumpStateHandler->wait(2500UL, PUMP_IDLE);
+    return pumpStateHandler->wait(PUMP_ACTIVE_TIME, PUMP_IDLE);
   }
   
   if(pumpStateHandler->state == PUMP_IDLE) {
     Serial.print("Variable_2:");
     Serial.println(0);
     digitalWrite(PIN_PUMP, LOW);
-    return pumpStateHandler->wait(10000UL, PUMP_CHECK);
+    return pumpStateHandler->wait(PUMP_IDLE_TIME, PUMP_CHECK);
   }
 }
 
 void setup() {
   Serial.begin(9600);
+
   pinMode(PIN_PUMP, OUTPUT);
+  digitalWrite(PIN_PUMP, LOW);
+
   pinMode(PIN_LED, OUTPUT);
+  digitalWrite(PIN_LED, LOW);
+
+  pinMode(PIN_WATER_SENSOR_POWER, OUTPUT);
+  digitalWrite(PIN_WATER_SENSOR_POWER, LOW);
 
   taskManager.scheduleFixedRate(1000, checkMoistureLevel);
   taskManager.scheduleFixedRate(500, checkWaterLevel);
