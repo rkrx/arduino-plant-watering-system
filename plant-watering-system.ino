@@ -4,10 +4,9 @@
 #define PIN_SOIL_SIGNAL 4
 #define PIN_LED 5
 #define PIN_WATER_SENSOR_POWER 6
-#define PIN_WATER_SENSOR_STATE A0
 
-#define PIN_WATER_LEVEL A0
-#define PIN_MOISTURE_SENSOR A2
+#define PIN_WATER_SENSOR_STATE A2
+#define PIN_MOISTURE_SENSOR A0
 
 #define MOISTURE_FULL_DRY 530
 #define MOISTURE_FULL_WET 240
@@ -18,6 +17,10 @@
 #define WATER_LEVEL_THRESHOLD 100
 #define PUMP_ACTIVE_TIME 2500UL
 #define PUMP_IDLE_TIME 10000UL
+
+#define VAR_WATER "Variable_1"
+#define VAR_MOISTURE "Variable_2"
+#define VAR_PUMP "Variable_3"
 
 enum MoistureLevel { SOIL_DRY, SOIL_MOIST, SOIL_WET };
 enum PumpState { PUMP_INIT, PUMP_CHECK, PUMP_WAIT, PUMP_ACTIVE, PUMP_IDLE, PUMP_OFF_BLINK_OFF, PUMP_OFF_BLINK_ON };
@@ -51,10 +54,20 @@ class PumpStateHandler {
 };
 
 MoistureLevel moistureLevel = SOIL_WET;
+unsigned long moistureIdleTimeout = 0;
+int moistureSensorValue = 0;
 PumpStateHandler* pumpStateHandler = new PumpStateHandler();
 
 void checkMoistureLevel() {
-  int moistureSensorValue = analogRead(PIN_MOISTURE_SENSOR);
+  if(moistureIdleTimeout < millis()) {
+    moistureSensorValue = analogRead(PIN_MOISTURE_SENSOR);
+    moistureIdleTimeout = millis() + 1500UL;
+  }
+  
+  Serial.print(VAR_MOISTURE);
+  Serial.print(":");
+  Serial.println(moistureSensorValue);
+
   if(moistureSensorValue > MOISTURE_DRY) {
     moistureLevel = SOIL_DRY;
     digitalWrite(PIN_SOIL_SIGNAL, HIGH);
@@ -78,7 +91,8 @@ void checkWaterLevel() {
   waterLevel = analogRead(PIN_WATER_SENSOR_STATE);
   digitalWrite(PIN_WATER_SENSOR_POWER, LOW);
 
-  Serial.print("Variable_3:");
+  Serial.print(VAR_WATER);
+  Serial.print(":");
   Serial.println(waterLevel);
 
   if(waterState == WATER_LOW) {
@@ -131,15 +145,13 @@ void handlePumpState() {
   }
   
   if(pumpStateHandler->state == PUMP_ACTIVE) {
-    Serial.print("Variable_2:");
-    Serial.println(500);
+    Serial.println(sprintf("%s:%d", VAR_PUMP, 500));
     digitalWrite(PIN_PUMP, HIGH);
     return pumpStateHandler->wait(PUMP_ACTIVE_TIME, PUMP_IDLE);
   }
   
   if(pumpStateHandler->state == PUMP_IDLE) {
-    Serial.print("Variable_2:");
-    Serial.println(0);
+    Serial.println(sprintf("%s:%d", VAR_PUMP, 500));
     digitalWrite(PIN_PUMP, LOW);
     return pumpStateHandler->wait(PUMP_IDLE_TIME, PUMP_CHECK);
   }
