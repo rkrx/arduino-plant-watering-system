@@ -10,11 +10,11 @@
 #define PIN_WATER_SENSOR_STATE A2
 #define PIN_MOISTURE_SENSOR A0
 
-#define MOISTURE_FULL_DRY 390
-#define MOISTURE_FULL_WET 260
-#define MOISTURE_INTERVAL (MOISTURE_FULL_DRY - MOISTURE_FULL_WET) / 3
-#define MOISTURE_DRY MOISTURE_FULL_DRY - MOISTURE_INTERVAL
-#define MOISTURE_WET MOISTURE_FULL_WET + MOISTURE_INTERVAL
+const int MOISTURE_FULL_DRY = 390;
+const int MOISTURE_FULL_WET = 260;
+const int MOISTURE_INTERVAL = (MOISTURE_FULL_DRY - MOISTURE_FULL_WET) / 3;
+const int MOISTURE_DRY = MOISTURE_FULL_DRY - MOISTURE_INTERVAL;
+const int MOISTURE_WET = MOISTURE_FULL_WET + MOISTURE_INTERVAL;
 
 #define WATER_LEVEL_THRESHOLD 100
 #define PUMP_ACTIVE_TIME 2500UL
@@ -41,8 +41,6 @@ LiquidCrystal lcd(LCD_RS_PIN, LCD_EN_PIN, LCD_D4_PIN, LCD_D5_PIN, LCD_D6_PIN, LC
 WaterState waterState = WATER_INIT;
 
 long pumpCount = 0;
-const byte moistureSensorValueCount = 10;
-int moistureSensorValues[moistureSensorValueCount] = { MOISTURE_DRY - MOISTURE_INTERVAL / 2 };
 
 class PumpStateHandler {
   private:
@@ -79,14 +77,16 @@ class PumpStateHandler {
     }
 };
 
+int moistureSensorValue = 0;
+const byte moistureSensorValueCount = 20;
+int moistureSensorValues[moistureSensorValueCount] = { 0 };
 MoistureLevel moistureLevel = SOIL_WET;
 unsigned long moistureIdleTimeout = 0;
-int moistureSensorValue = 0;
+
 PumpStateHandler* pumpStateHandler = new PumpStateHandler();
 
 void checkMoistureLevel() {
   if(moistureIdleTimeout < millis()) {
-    int newMoistureSensorValue = analogRead(PIN_MOISTURE_SENSOR);
     moistureIdleTimeout = millis() + 1500UL;
 
     int total = 0;
@@ -94,8 +94,7 @@ void checkMoistureLevel() {
     moistureSensorValues[i + 1] = moistureSensorValues[i];
       total += moistureSensorValues[i];
     }
-    moistureSensorValues[0] = newMoistureSensorValue; 
-
+    moistureSensorValues[0] = analogRead(PIN_MOISTURE_SENSOR);
     moistureSensorValue = total / moistureSensorValueCount;
 
     Serial.print(VAR_MOISTURE);
@@ -203,7 +202,7 @@ void updateDisplay() {
   lcd.setCursor(0, 0);
   lcd.print((moistureSensorValue - MOISTURE_WET) * 100 / (MOISTURE_DRY - MOISTURE_WET));
   lcd.print("% DRY, ");
-  
+
   if(pumpStateHandler->getState() == PUMP_INIT) {
     lcd.print("INIT");
   } else if(pumpStateHandler->getState() == PUMP_WAIT) {
@@ -219,18 +218,22 @@ void updateDisplay() {
   }
 
   lcd.setCursor(0, 1);
-  lcd.print("Water ");
+  lcd.print("P: ");
+  lcd.print(pumpCount);
+  lcd.print(", Water ");
   if(waterState == WATER_OK) {
     lcd.print("OK");
   } else {
     lcd.print("Empty");
   }
-  lcd.print(", Pump: ");
-  lcd.print(pumpCount);
 }
 
 void setup() {
   Serial.begin(9600);
+
+  for(int i = 0; i < moistureSensorValueCount; i++) {
+    moistureSensorValues[i] = MOISTURE_DRY - (MOISTURE_DRY - MOISTURE_WET) / 2;
+  }
 
   lcd.begin(16, 2);
 
