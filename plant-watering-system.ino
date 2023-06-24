@@ -3,6 +3,7 @@
 
 //region Constants
 #define PIN_PUMP 3
+#define PIN_PUMP_MANUAL 13
 #define PIN_SOIL_SIGNAL 4
 #define PIN_LED 5
 #define PIN_WATER_SENSOR_POWER 6
@@ -137,6 +138,17 @@ void checkWaterLevel() {
 }
 
 void handlePumpState() {
+  bool manualPump = digitalRead(PIN_PUMP_MANUAL) > 0;
+
+  if(manualPump) {
+    digitalWrite(PIN_PUMP, HIGH);
+    return;
+  }
+
+  if(pumpStateHandler->getState() != PUMP_ACTIVE) {
+    digitalWrite(PIN_PUMP, LOW);
+  }
+
   if(pumpStateHandler->isWaiting()) {
     return;
   }
@@ -191,7 +203,6 @@ void handlePumpState() {
   
   if(pumpStateHandler->getState() == PUMP_IDLE) {
     Serial.println(sprintf("%s:%d", VAR_PUMP, 0));
-    digitalWrite(PIN_PUMP, LOW);
     return pumpStateHandler->wait(PUMP_IDLE_TIME, PUMP_CHECK);
   }
 }
@@ -240,6 +251,8 @@ void setup() {
   pinMode(PIN_PUMP, OUTPUT);
   digitalWrite(PIN_PUMP, LOW);
 
+  pinMode(PIN_PUMP_MANUAL, INPUT);
+
   pinMode(PIN_SOIL_SIGNAL, OUTPUT);
   digitalWrite(PIN_SOIL_SIGNAL, LOW);
 
@@ -250,7 +263,7 @@ void setup() {
   digitalWrite(PIN_WATER_SENSOR_POWER, LOW);
 
   taskManager.scheduleFixedRate(10, checkMoistureLevel);
-  taskManager.scheduleFixedRate(1500, checkWaterLevel);
+  taskManager.scheduleFixedRate(5000, checkWaterLevel);
   taskManager.scheduleFixedRate(50, handlePumpState);
   taskManager.scheduleFixedRate(1000, updateDisplay);
 }
