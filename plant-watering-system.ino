@@ -1,5 +1,5 @@
 #include <TaskManagerIO.h>
-#include <LiquidCrystal.h>
+#include <LiquidCrystal_I2C.h>
 
 //region Constants
 #define PIN_PUMP 3
@@ -25,19 +25,13 @@ const int MOISTURE_WET = MOISTURE_FULL_WET + MOISTURE_INTERVAL;
 #define VAR_MOISTURE "Moisture"
 #define VAR_PUMP "Pump"
 
-#define LCD_RS_PIN 12
-#define LCD_EN_PIN 11
-#define LCD_D4_PIN 10
-#define LCD_D5_PIN 9
-#define LCD_D6_PIN 8
-#define LCD_D7_PIN 7
 //endregion
 
 enum MoistureLevel { SOIL_DRY, SOIL_MOIST, SOIL_WET };
 enum PumpState { PUMP_INIT, PUMP_CHECK, PUMP_WAIT, PUMP_ACTIVE, PUMP_IDLE, PUMP_OFF_BLINK_OFF, PUMP_OFF_BLINK_ON };
 enum WaterState { WATER_INIT, WATER_OK, WATER_LOW };
 
-LiquidCrystal lcd(LCD_RS_PIN, LCD_EN_PIN, LCD_D4_PIN, LCD_D5_PIN, LCD_D6_PIN, LCD_D7_PIN);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 WaterState waterState = WATER_INIT;
 
@@ -246,7 +240,10 @@ void setup() {
     moistureSensorValues[i] = MOISTURE_DRY - (MOISTURE_DRY - MOISTURE_WET) / 2;
   }
 
-  lcd.begin(16, 2);
+  //lcd.begin(16, 2);
+  lcd.init();
+  lcd.backlight();
+  lcd.print("Startup...");
 
   pinMode(PIN_PUMP, OUTPUT);
   digitalWrite(PIN_PUMP, LOW);
