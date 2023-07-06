@@ -1,5 +1,8 @@
 #include <TaskManagerIO.h>
-#include <LiquidCrystal_I2C.h>
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 
 //region Constants
 #define PIN_PUMP 3
@@ -31,7 +34,11 @@ enum MoistureLevel { SOIL_DRY, SOIL_MOIST, SOIL_WET };
 enum PumpState { PUMP_INIT, PUMP_CHECK, PUMP_WAIT, PUMP_ACTIVE, PUMP_IDLE, PUMP_OFF_BLINK_OFF, PUMP_OFF_BLINK_ON };
 enum WaterState { WATER_INIT, WATER_OK, WATER_LOW };
 
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+#define SCREEN_WIDTH    128 // OLED display width, in pixels
+#define SCREEN_HEIGHT    64 // OLED display height, in pixels
+#define OLED_RESET       -1 // Reset pin # (or -1 if sharing Arduino reset pin)
+#define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 WaterState waterState = WATER_INIT;
 
@@ -202,35 +209,46 @@ void handlePumpState() {
 }
 
 void updateDisplay() {
-  lcd.clear();
+  display.clearDisplay();
 
-  lcd.setCursor(0, 0);
-  lcd.print((moistureSensorValue - MOISTURE_WET) * 100 / (MOISTURE_DRY - MOISTURE_WET));
-  lcd.print("% DRY, ");
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.setTextSize(2);
+  display.print((moistureSensorValue - MOISTURE_WET) * 100 / (MOISTURE_DRY - MOISTURE_WET));
+  display.println(F("% DRY"));
 
+  display.setCursor(0, 16);
+  display.setTextSize(1);
+  display.print("Pump-State: ");
   if(pumpStateHandler->getState() == PUMP_INIT) {
-    lcd.print("INIT");
+    display.print("INIT");
   } else if(pumpStateHandler->getState() == PUMP_WAIT) {
-    lcd.print("WAIT");
+    display.print("WAIT");
   } else if(pumpStateHandler->getState() == PUMP_ACTIVE) {
-    lcd.print("ACTIVE");
+    display.print("ACTIVE");
   } else if(pumpStateHandler->getState() == PUMP_CHECK) {
-    lcd.print("CHECK");
+    display.print("CHECK");
   } else if(pumpStateHandler->getState() == PUMP_IDLE) {
-    lcd.print("IDLE");
+    display.print("IDLE");
   } else if(pumpStateHandler->getState() == PUMP_OFF_BLINK_OFF || pumpStateHandler->getState() == PUMP_OFF_BLINK_ON) {
-    lcd.print("OFF");
+    display.print("OFF");
   }
 
-  lcd.setCursor(0, 1);
-  lcd.print("P: ");
-  lcd.print(pumpCount);
-  lcd.print(", Water ");
+  display.setCursor(0, 24);
+  display.setTextSize(1);
+  display.print("Pump-Count: ");
+  display.print(pumpCount);
+
+  display.setCursor(0, 32);
+  display.setTextSize(1);
+  display.print("Water: ");
   if(waterState == WATER_OK) {
-    lcd.print("OK");
+    display.print("OK");
   } else {
-    lcd.print("Empty");
+    display.print("Empty");
   }
+
+  display.display();
 }
 
 void setup() {
@@ -240,10 +258,13 @@ void setup() {
     moistureSensorValues[i] = MOISTURE_DRY - (MOISTURE_DRY - MOISTURE_WET) / 2;
   }
 
-  //lcd.begin(16, 2);
-  lcd.init();
-  lcd.backlight();
-  lcd.print("Startup...");
+  display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(2);
+  display.setCursor(0, 16);
+  display.println("Startup...");
+  display.display();
 
   pinMode(PIN_PUMP, OUTPUT);
   digitalWrite(PIN_PUMP, LOW);
